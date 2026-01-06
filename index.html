@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DOT REMOTE</title>
+    <link rel="apple-touch-icon" href="images/app-icon.png">
+    <link rel="icon" type="image/png" href="images/app-icon.png">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* App structure */
+        body {
+            padding: 0;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .loading-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loading-robot {
+            width: 80px;
+            height: auto;
+            position: relative;
+        }
+
+        .loading-robot img {
+            width: 100%;
+            height: auto;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            25% { transform: scale(1.15); opacity: 0.9; }
+            50% { transform: scale(1); opacity: 1; }
+            75% { transform: scale(1.1); opacity: 0.95; }
+        }
+
+        .loading-robot::after {
+            content: '';
+            position: absolute;
+            top: 52%;
+            left: calc(50% - 10px);
+            transform: translate(-50%, -50%);
+            width: 18px;
+            height: 16px;
+            background: var(--hunch-red, #ED1C24);
+            clip-path: path('M9 2.5C6.5 -0.5 2 0.5 2 4c0 3 7 8 7 8s7-5 7-8c0-3.5-4.5-4.5-7-1.5z');
+            animation: heartbeat 1s ease-in-out infinite;
+        }
+
+        .loading-text {
+            margin-top: 16px;
+            font-size: 14px;
+            color: var(--grey-text, #999);
+            font-weight: 500;
+        }
+
+        .app-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .red-bar {
+            height: 4px;
+            background: var(--hunch-red);
+            width: 100%;
+            flex-shrink: 0;
+        }
+
+        .screen-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease-in-out;
+            background: var(--white);
+        }
+
+        .screen.hidden {
+            transform: translateX(100%);
+        }
+
+        .screen.active {
+            transform: translateX(0);
+        }
+
+        .screen.exit-left {
+            transform: translateX(-100%);
+        }
+
+        /* Header section with keyline */
+        .header-section {
+            padding: 48px 24px 24px;
+            border-bottom: 1px solid var(--grey-border, #e5e5e5);
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header img {
+            height: 52px;
+            width: auto;
+        }
+
+        /* Back button */
+        .back-btn {
+            position: absolute;
+            top: 48px;
+            left: 20px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--hunch-red);
+            cursor: pointer;
+            padding: 0.25rem;
+            z-index: 10;
+            line-height: 1;
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            gap: 12px;
+        }
+
+        /* Card buttons */
+        .card-btn {
+            font-family: var(--font-body);
+            padding: 16px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--white);
+            border: 1.5px solid var(--grey-border, #e5e5e5);
+            color: var(--black);
+        }
+
+        .card-btn:hover {
+            border-color: var(--hunch-red);
+        }
+
+        .card-btn:active {
+            background: var(--grey-light, #f5f5f5);
+        }
+
+        /* Icon box */
+        .card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            border: 1.5px solid var(--grey-border, #e5e5e5);
+            background: var(--white);
+        }
+
+        .card-icon svg {
+            width: 22px;
+            height: 22px;
+            stroke: var(--hunch-red);
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        /* Text stack */
+        .card-text {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .card-label {
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--grey-text, #999);
+        }
+
+        .card-action {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--black);
+        }
+
+        /* Spacer */
+        .spacer {
+            flex: 1;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 20px 24px 32px;
+            text-align: center;
+            border-top: 1px solid var(--grey-border, #e5e5e5);
+        }
+
+        .footer img {
+            height: 36px;
+            width: auto;
+            opacity: 0.4;
+        }
+
+        /* Form screens */
+        .form-screen {
+            padding: 0;
+        }
+
+        .form-screen .header-section {
+            padding-top: 48px;
+        }
+
+        .form-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            padding: 24px;
+        }
+
+        .form-content .form-group label {
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            color: var(--grey-text, #999);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .form-content select {
+            font-family: var(--font-body);
+            font-size: 1rem;
+            padding: 0.875rem 1rem;
+            border: 1.5px solid var(--grey-border, #e5e5e5);
+            border-radius: 12px;
+            background: var(--white);
+            width: 100%;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.25rem;
+            transition: border-color 0.15s ease;
+        }
+
+        .form-content select:focus {
+            outline: none;
+            border-color: var(--hunch-red);
+        }
+
+        .form-content textarea {
+            font-family: var(--font-body);
+            font-size: 1rem;
+            padding: 0.875rem 1rem;
+            border: 1.5px solid var(--grey-border, #e5e5e5);
+            border-radius: 12px;
+            background: var(--white);
+            width: 100%;
+            min-height: 120px;
+            resize: none;
+            transition: border-color 0.15s ease;
+        }
+
+        .form-content textarea:focus {
+            outline: none;
+            border-color: var(--hunch-red);
+        }
+
+        .form-content textarea::placeholder {
+            color: var(--grey-text, #999);
+        }
+
+        .form-actions {
+            margin-top: 1.5rem;
+        }
+
+        .form-actions .pill {
+            width: 100%;
+        }
+
+        .form-content.hide {
+            display: none;
+        }
+
+        /* Form header */
+        .form-title {
+            font-family: var(--font-heading);
+            font-size: 1.5rem;
+            color: var(--black);
+            letter-spacing: 0.02em;
+            font-weight: normal;
+            text-align: center;
+        }
+
+        /* Overlay */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            z-index: 100;
+        }
+
+        .overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .overlay-content {
+            background: var(--white);
+            border-radius: 20px;
+            padding: 2.5rem 2rem;
+            margin: 1.5rem;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .overlay.show .overlay-content {
+            transform: scale(1);
+        }
+
+        .overlay-content p {
+            font-size: 1.25rem;
+            color: var(--black);
+            margin-bottom: 2rem;
+            line-height: 1.4;
+        }
+
+        .overlay-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .overlay-buttons .pill {
+            min-width: 100px;
+            flex: 1;
+        }
+
+        .overlay-success {
+            display: none;
+        }
+
+        .overlay-success.show {
+            display: block;
+        }
+
+        .overlay-confirm.hide {
+            display: none;
+        }
+
+        /* Success state */
+        .success-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--hunch-red);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--white);
+            font-size: 1.75rem;
+            margin: 0 auto 1.25rem;
+        }
+
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 2.5rem 1.5rem;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 1.5rem;
+        }
+
+        .success-message.show {
+            display: flex;
+        }
+
+        .success-message h3,
+        .overlay-success h3 {
+            font-family: var(--font-heading);
+            font-size: 1.75rem;
+            color: var(--black);
+            letter-spacing: 0.02em;
+            font-weight: normal;
+        }
+
+        .overlay-success h3 {
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="red-bar"></div>
+        
+        <div class="screen-container">
+            <!-- Main Menu Screen -->
+            <div class="screen active" id="screen-main">
+                <div class="header-section">
+                    <div class="header">
+                        <img src="images/header-logo.png" alt="DOT REMOTE">
+                    </div>
+                </div>
+
+                <div class="main-content">
+                    <button class="card-btn" onclick="navigate('update')">
+                        <div class="card-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                <path d="m15 5 4 4"/>
+                            </svg>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-label">Update</span>
+                            <span class="card-action">What's next?</span>
+                        </div>
+                    </button>
+
+                    <button class="card-btn" onclick="showTodoOverlay()">
+                        <div class="card-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M9 11l3 3L22 4"/>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                            </svg>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-label">To Do</span>
+                            <span class="card-action">What's on?</span>
+                        </div>
+                    </button>
+
+                    <button class="card-btn" onclick="navigate('wip')">
+                        <div class="card-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                                <path d="M9 12h6"/>
+                                <path d="M9 16h6"/>
+                            </svg>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-label">WIP</span>
+                            <span class="card-action">Which client?</span>
+                        </div>
+                    </button>
+
+                    <button class="card-btn" onclick="navigate('incoming')">
+                        <div class="card-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 5v14"/>
+                                <path d="m19 12-7 7-7-7"/>
+                            </svg>
+                        </div>
+                        <div class="card-text">
+                            <span class="card-label">Incoming</span>
+                            <span class="card-action">What's new?</span>
+                        </div>
+                    </button>
+
+                    <div class="spacer"></div>
+                </div>
+
+                <div class="footer">
+                    <img src="images/ai2-logo.png" alt="ai²">
+                </div>
+            </div>
+
+            <!-- UPDATE Screen -->
+            <div class="screen hidden form-screen" id="screen-update">
+                <div class="header-section">
+                    <button class="back-btn" onclick="navigate('main')">←</button>
+                    <div class="header">
+                        <h1 class="form-title">UPDATE</h1>
+                    </div>
+                </div>
+
+                <div class="form-content" id="update-form">
+                    <div class="form-group">
+                        <label>Client</label>
+                        <select id="update-client-select" onchange="onUpdateClientChange()">
+                            <option value="">Choose a client...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="update-job-group" style="display: none;">
+                        <label>Job</label>
+                        <select id="update-job-select">
+                            <option value="">Choose a job...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="update-text-group" style="display: none;">
+                        <label>Update</label>
+                        <textarea id="update-text" placeholder="What's the latest?"></textarea>
+                    </div>
+
+                    <div class="form-actions" id="update-actions" style="display: none;">
+                        <button class="pill send-btn" onclick="submitUpdate()">SEND</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- WIP Screen -->
+            <div class="screen hidden form-screen" id="screen-wip">
+                <div class="header-section">
+                    <button class="back-btn" onclick="navigate('main')">←</button>
+                    <div class="header">
+                        <h1 class="form-title">WIP</h1>
+                    </div>
+                </div>
+
+                <div class="form-content" id="wip-form">
+                    <div class="form-group">
+                        <label>Client</label>
+                        <select id="wip-client-select" onchange="onWipClientChange()">
+                            <option value="">Choose a client...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INCOMING Screen -->
+            <div class="screen hidden form-screen" id="screen-incoming">
+                <div class="header-section">
+                    <button class="back-btn" onclick="navigate('main')">←</button>
+                    <div class="header">
+                        <h1 class="form-title">INCOMING</h1>
+                    </div>
+                </div>
+
+                <div class="form-content" id="incoming-form">
+                    <div class="form-group">
+                        <label>Client</label>
+                        <select id="incoming-client-select">
+                            <option value="">Choose a client...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>What's coming?</label>
+                        <textarea id="incoming-text" placeholder="e.g. Box Colours refresh, need by Feb"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="pill send-btn" onclick="submitIncoming()">CREATE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TO DO Overlay -->
+        <div class="overlay" id="todo-overlay">
+            <div class="overlay-content">
+                <div class="overlay-confirm" id="todo-confirm">
+                    <p>Want the latest<br>to do list?</p>
+                    <div class="overlay-buttons">
+                        <button class="pill action-btn" onclick="hideTodoOverlay()">NO</button>
+                        <button class="pill send-btn" onclick="submitTodo()">YES</button>
+                    </div>
+                </div>
+                <div class="overlay-success" id="todo-success">
+                    <div class="success-icon">✓</div>
+                    <h3>SENT TO DOT</h3>
+                    <button class="pill action-btn" onclick="hideTodoOverlay()">DONE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- WIP Confirmation Overlay -->
+        <div class="overlay" id="wip-overlay">
+            <div class="overlay-content">
+                <div class="overlay-confirm" id="wip-confirm">
+                    <p>Get the WIP?</p>
+                    <div class="overlay-buttons">
+                        <button class="pill action-btn" onclick="hideWipOverlay()">NO</button>
+                        <button class="pill send-btn" onclick="submitWip()">YES</button>
+                    </div>
+                </div>
+                <div class="overlay-success" id="wip-success-overlay">
+                    <div class="success-icon">✓</div>
+                    <h3>SENT TO DOT</h3>
+                    <button class="pill action-btn" onclick="hideWipOverlay(); navigate('main');">DONE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Update Success Overlay -->
+        <div class="overlay" id="update-overlay">
+            <div class="overlay-content">
+                <div class="success-icon">✓</div>
+                <h3>SENT TO DOT</h3>
+                <button class="pill action-btn" onclick="hideUpdateOverlay()">DONE</button>
+            </div>
+        </div>
+
+        <!-- Incoming Success Overlay -->
+        <div class="overlay" id="incoming-overlay">
+            <div class="overlay-content">
+                <div class="success-icon">✓</div>
+                <h3 id="incoming-job-number">SKY 046</h3>
+                <p id="incoming-project-name" style="color: var(--grey-text); margin-top: 0.5rem;">Project Name</p>
+                <button class="pill action-btn" onclick="hideIncomingOverlay()" style="margin-top: 1.5rem;">DONE</button>
+            </div>
+        </div>
+
+        <div class="red-bar"></div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-robot">
+            <img src="images/Robot.png" alt="Dot thinking...">
+        </div>
+        <p class="loading-text" id="loading-text">Dot is thinking...</p>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'https://dot-remote-api.up.railway.app';
+        const PROXY_BASE = 'https://dot-proxy.up.railway.app';
+
+        // State
+        let clients = [];
+        let jobsByClient = {};
+        let currentScreen = 'main';
+        let screenHistory = ['main'];
+
+        // Loading helpers
+        function showLoading(text = 'Dot is thinking...') {
+            document.getElementById('loading-text').textContent = text;
+            document.getElementById('loading-overlay').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.remove('show');
+        }
+
+        // Initialize - fetch clients on load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadClients();
+        });
+
+        // Fetch clients from Railway/Airtable
+        async function loadClients() {
+            try {
+                const response = await fetch(`${API_BASE}/clients`);
+                if (response.ok) {
+                    clients = await response.json();
+                    populateClientDropdowns();
+                }
+            } catch (error) {
+                console.log('Using fallback client data');
+                clients = [
+                    { code: 'SKY', name: 'Sky TV' },
+                    { code: 'ONE', name: 'One NZ' },
+                    { code: 'TWR', name: 'Tower Insurance' },
+                    { code: 'FSH', name: 'Fisher Funds' }
+                ];
+                populateClientDropdowns();
+            }
+        }
+
+        // Fetch jobs for a specific client
+        async function loadJobs(clientName) {
+            if (jobsByClient[clientName]) {
+                return jobsByClient[clientName];
+            }
+
+            showLoading('Finding jobs...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/jobs?client=${encodeURIComponent(clientName)}`);
+                if (response.ok) {
+                    const jobs = await response.json();
+                    jobsByClient[clientName] = jobs;
+                    hideLoading();
+                    return jobs;
+                }
+            } catch (error) {
+                console.log('Using fallback job data');
+            }
+
+            hideLoading();
+            jobsByClient[clientName] = [];
+            return jobsByClient[clientName];
+        }
+
+        // Populate client dropdowns
+        function populateClientDropdowns() {
+            const dropdowns = ['update-client-select', 'wip-client-select', 'incoming-client-select'];
+            dropdowns.forEach(id => {
+                const select = document.getElementById(id);
+                select.innerHTML = '<option value="">Choose a client...</option>';
+                clients.forEach(client => {
+                    const option = document.createElement('option');
+                    option.value = client.code;
+                    option.textContent = client.name;
+                    option.dataset.name = client.name;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        // Navigation
+        function navigate(screenId) {
+            const currentEl = document.getElementById('screen-' + currentScreen);
+            const targetEl = document.getElementById('screen-' + screenId);
+
+            resetSuccessStates();
+
+            const goingBack = screenHistory.includes(screenId);
+
+            if (goingBack) {
+                currentEl.classList.remove('active');
+                currentEl.classList.add('hidden');
+                targetEl.classList.remove('exit-left');
+                targetEl.classList.add('active');
+                
+                while (screenHistory[screenHistory.length - 1] !== screenId) {
+                    screenHistory.pop();
+                }
+            } else {
+                currentEl.classList.remove('active');
+                currentEl.classList.add('exit-left');
+                targetEl.classList.remove('hidden');
+                targetEl.classList.add('active');
+                
+                screenHistory.push(screenId);
+            }
+
+            currentScreen = screenId;
+        }
+
+        function resetSuccessStates() {
+            document.querySelectorAll('.success-message').forEach(el => el.classList.remove('show'));
+            document.querySelectorAll('.form-content').forEach(el => el.classList.remove('hide'));
+            document.querySelectorAll('select').forEach(el => el.value = '');
+            document.querySelectorAll('textarea').forEach(el => el.value = '');
+            
+            // Reset UPDATE form visibility
+            document.getElementById('update-job-group').style.display = 'none';
+            document.getElementById('update-text-group').style.display = 'none';
+            document.getElementById('update-actions').style.display = 'none';
+            document.getElementById('update-overlay').classList.remove('show');
+            
+            // Reset overlay states
+            document.getElementById('wip-confirm').classList.remove('hide');
+            document.getElementById('wip-success-overlay').classList.remove('show');
+        }
+
+        // UPDATE flow - client selection triggers job load
+        async function onUpdateClientChange() {
+            const clientSelect = document.getElementById('update-client-select');
+            const client = clientSelect.value;
+            
+            const jobGroup = document.getElementById('update-job-group');
+            const textGroup = document.getElementById('update-text-group');
+            const actions = document.getElementById('update-actions');
+            const jobSelect = document.getElementById('update-job-select');
+            
+            if (!client) {
+                jobGroup.style.display = 'none';
+                textGroup.style.display = 'none';
+                actions.style.display = 'none';
+                return;
+            }
+
+            // Load jobs and show job dropdown
+            const jobs = await loadJobs(client);
+            jobSelect.innerHTML = '<option value="">Choose a job...</option>';
+            
+            jobs.forEach(job => {
+                const option = document.createElement('option');
+                option.value = job.id;
+                option.textContent = job.name;
+                jobSelect.appendChild(option);
+            });
+
+            jobGroup.style.display = 'block';
+            textGroup.style.display = 'block';
+            actions.style.display = 'block';
+        }
+
+        // UPDATE submit - straight to success
+        async function submitUpdate() {
+            const job = document.getElementById('update-job-select').value;
+            const update = document.getElementById('update-text').value;
+            const client = document.getElementById('update-client-select').value;
+
+            if (!job) {
+                alert('Please select a job');
+                return;
+            }
+
+            if (!update.trim()) {
+                alert('Please enter an update');
+                return;
+            }
+
+            // Extract client code from client name (first 3 letters)
+            const clientCode = client.split(' ')[0].substring(0, 3).toUpperCase();
+
+            // Send to proxy
+            try {
+                await fetch(`${PROXY_BASE}/proxy/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        ClientCode: clientCode,
+                        JobNumber: job,
+                        message: update 
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to send update:', error);
+            }
+
+            document.getElementById('update-overlay').classList.add('show');
+        }
+
+        function hideUpdateOverlay() {
+            document.getElementById('update-overlay').classList.remove('show');
+            navigate('main');
+        }
+
+        // WIP flow - client selection auto-triggers confirmation
+        function onWipClientChange() {
+            const client = document.getElementById('wip-client-select').value;
+            
+            if (client) {
+                document.getElementById('wip-overlay').classList.add('show');
+            }
+        }
+
+        function hideWipOverlay() {
+            document.getElementById('wip-overlay').classList.remove('show');
+            document.getElementById('wip-client-select').value = '';
+            document.getElementById('wip-confirm').classList.remove('hide');
+            document.getElementById('wip-success-overlay').classList.remove('show');
+        }
+
+        async function submitWip() {
+            const client = document.getElementById('wip-client-select').value;
+            
+            // Extract client code from client name (first 3 letters)
+            const clientCode = client.split(' ')[0].substring(0, 3).toUpperCase();
+
+            // Send to proxy
+            try {
+                await fetch(`${PROXY_BASE}/proxy/wip`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        client: client,
+                        ClientCode: clientCode 
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to send WIP:', error);
+            }
+
+            document.getElementById('wip-confirm').classList.add('hide');
+            document.getElementById('wip-success-overlay').classList.add('show');
+        }
+
+        // TO DO overlay
+        function showTodoOverlay() {
+            document.getElementById('todo-overlay').classList.add('show');
+            document.getElementById('todo-confirm').classList.remove('hide');
+            document.getElementById('todo-success').classList.remove('show');
+        }
+
+        function hideTodoOverlay() {
+            document.getElementById('todo-overlay').classList.remove('show');
+        }
+
+        async function submitTodo() {
+            // Send to proxy (GET request)
+            try {
+                await fetch(`${PROXY_BASE}/proxy/todo`, {
+                    method: 'GET'
+                });
+            } catch (error) {
+                console.error('Failed to send TO DO:', error);
+            }
+
+            document.getElementById('todo-confirm').classList.add('hide');
+            document.getElementById('todo-success').classList.add('show');
+        }
+
+        // INCOMING functions
+        async function submitIncoming() {
+            const clientSelect = document.getElementById('incoming-client-select');
+            const clientCode = clientSelect.value;
+            const clientName = clientSelect.options[clientSelect.selectedIndex]?.dataset?.name || '';
+            const text = document.getElementById('incoming-text').value.trim();
+            
+            if (!clientCode) {
+                alert('Please select a client');
+                return;
+            }
+
+            if (!text) {
+                alert('Please describe the incoming job');
+                return;
+            }
+
+            showLoading('Creating job...');
+
+            try {
+                const response = await fetch(`${PROXY_BASE}/proxy/incoming`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: text,
+                        clientCode: clientCode,
+                        clientName: clientName
+                    })
+                });
+
+                const result = await response.json();
+                hideLoading();
+
+                if (result.success) {
+                    document.getElementById('incoming-job-number').textContent = result.jobNumber;
+                    document.getElementById('incoming-project-name').textContent = result.projectName;
+                    document.getElementById('incoming-overlay').classList.add('show');
+                } else if (result.message) {
+                    // Claude couldn't identify client
+                    alert(result.message);
+                } else {
+                    alert('Failed to create job: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                hideLoading();
+                console.error('Failed to create incoming job:', error);
+                alert('Failed to connect to Dot');
+            }
+        }
+
+        function hideIncomingOverlay() {
+            document.getElementById('incoming-overlay').classList.remove('show');
+            document.getElementById('incoming-text').value = '';
+            navigate('main');
+        }
+    </script>
+</body>
+</html>
