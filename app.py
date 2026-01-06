@@ -232,10 +232,14 @@ def incoming():
         else:
             return jsonify({'error': 'No input provided'}), 400
         
+        # Check if client was provided directly (from Remote dropdown)
+        provided_client_code = data.get('clientCode')
+        provided_client_name = data.get('clientName')
+        
         # Include current date for Claude's context
         current_date = datetime.now().strftime('%B %d, %Y')
         
-        # Parse with Claude
+        # Parse with Claude (still need to extract project name, month, owner)
         response = client.messages.create(
             model='claude-sonnet-4-20250514',
             max_tokens=500,
@@ -254,8 +258,14 @@ def incoming():
         
         parsed = json.loads(content.strip())
         
-        client_code = parsed.get('clientCode')
-        client_name = parsed.get('clientName', '')
+        # Use provided client if available, otherwise use parsed
+        if provided_client_code:
+            client_code = provided_client_code
+            client_name = provided_client_name or parsed.get('clientName', '')
+        else:
+            client_code = parsed.get('clientCode')
+            client_name = parsed.get('clientName', '')
+        
         project_name = parsed.get('projectName', 'TBC')
         parsed_month = parsed.get('month')
         owner = parsed.get('owner')
