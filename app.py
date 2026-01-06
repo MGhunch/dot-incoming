@@ -256,16 +256,27 @@ def incoming():
         # Include current date for Claude's context
         current_date = datetime.now().strftime('%B %d, %Y')
         
-        # Parse with Claude (still need to extract project name, month, owner)
-        response = client.messages.create(
-            model='claude-sonnet-4-20250514',
-            max_tokens=500,
-            messages=[
-                {'role': 'user', 'content': f'Today is {current_date}.\n\n{PARSE_PROMPT}\n\nInput: {input_text}'}
-            ]
-        )
+        print(f"INCOMING: Processing request - client: {provided_client_code}, text: {input_text[:100]}...")
         
-        content = response.content[0].text
+        # Parse with Claude (still need to extract project name, month, owner)
+        try:
+            response = client.messages.create(
+                model='claude-sonnet-4-20250514',
+                max_tokens=500,
+                messages=[
+                    {'role': 'user', 'content': f'Today is {current_date}.\n\n{PARSE_PROMPT}\n\nInput: {input_text}'}
+                ]
+            )
+            
+            content = response.content[0].text
+            print(f"INCOMING: Claude response: {content[:200]}...")
+            
+        except Exception as claude_error:
+            print(f"INCOMING: Claude API error: {str(claude_error)}")
+            return jsonify({
+                'success': False,
+                'error': f'Claude API error: {str(claude_error)}'
+            }), 500
         
         # Clean up response (remove markdown if present)
         if '```json' in content:
@@ -273,7 +284,17 @@ def incoming():
         elif '```' in content:
             content = content.split('```')[1].split('```')[0]
         
-        parsed = json.loads(content.strip())
+        content = content.strip()
+        
+        if not content:
+            print("INCOMING: Empty content after cleanup")
+            return jsonify({
+                'success': False,
+                'error': "Sorry, didn't get that. Have another go."
+            }), 500
+        
+        print(f"INCOMING: Parsing JSON: {content[:200]}...")
+        parsed = json.loads(content)
         
         # Use provided client if available, otherwise use parsed
         if provided_client_code:
@@ -369,14 +390,16 @@ def incoming():
         })
         
     except json.JSONDecodeError as e:
+        print(f"INCOMING: JSON parse error: {str(e)}")
         return jsonify({
             'success': False,
-            'error': f'Failed to parse Claude response: {str(e)}'
+            'error': "Sorry, didn't get that. Have another go."
         }), 500
     except Exception as e:
+        print(f"INCOMING: Unexpected error: {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': "Sorry, didn't get that. Have another go."
         }), 500
 
 
