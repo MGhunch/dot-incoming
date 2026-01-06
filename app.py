@@ -52,11 +52,12 @@ def get_target_month(parsed_month):
 # Claude prompt for parsing incoming job requests
 PARSE_PROMPT = """You are Dot Incoming, a pre-triage assistant for Hunch creative agency.
 
-Your job is to extract client, project, timing, and owner information from minimal input. People will send brief messages like:
+Your job is to extract client, project, timing, budget, and owner information from minimal input. People will send brief messages like:
 - "New job for Sky - Box Colours"
-- "Heads up - Tower want something on sustainability for Feb"
+- "Heads up - Tower want something on sustainability for Feb, about $8K"
 - "Fisher Funds - annual report refresh, Sarah's leading it"
 - "incoming from one nz, campaign refresh next month"
+- "Sky thing, call it Project Chris, $12,000"
 
 CLIENTS (match fuzzy - people use nicknames):
 - ONE = One NZ, One, One New Zealand, One NZ Marketing, One Marketing
@@ -80,9 +81,21 @@ OWNERS (match fuzzy to these known contacts):
 EXTRACT:
 1. clientCode - The 3-letter code (ONE, ONB, ONS, SKY, TOW, FIS, FST, EON, LAB)
 2. clientName - Full client name
-3. projectName - Whatever description is given (clean it up if needed)
-4. month - Target month if mentioned (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec), or null if not mentioned
-5. owner - Person's name if mentioned, or null if not mentioned
+3. projectName - The project name (see rules below)
+4. projectNameExplicit - true if user explicitly named it, false if you're inferring
+5. month - Target month if mentioned (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec), or null if not mentioned
+6. owner - Person's name if mentioned, or null if not mentioned
+7. budget - Dollar amount if mentioned (as integer, e.g. 8000), or null if not mentioned
+
+PROJECT NAME RULES:
+- EXPLICIT (projectNameExplicit = true): User says "call it X", "named X", "project name is X", "Project X"
+- INFERRED (projectNameExplicit = false): You're guessing from context like "sustainability thing" or "annual report refresh"
+
+BUDGET HINTS:
+- "$8K" or "$8k" = 8000
+- "$12,000" or "$12000" = 12000
+- "~$3k" or "about $3K" = 3000
+- No amount mentioned = null
 
 MONTH HINTS:
 - "Feb" or "February" → "Feb"
@@ -95,8 +108,10 @@ RESPOND WITH JSON ONLY:
     "clientCode": "SKY",
     "clientName": "Sky TV",
     "projectName": "Box Colours",
+    "projectNameExplicit": false,
     "month": "Feb",
-    "owner": null
+    "owner": null,
+    "budget": 8000
 }
 """
 
@@ -174,8 +189,8 @@ def create_project(job_number, client_name, project_name):
         return None, str(e)
 
 
-def create_tracker(project_record_id, project_name, client_name, month, owner):
-    """Create a tracker record with $5K ballpark in the right month"""
+def create_tracker(project_record_id, project_name, client_name, month, owner, budget=5000):
+    """Create a tracker record with ballpark budget in the right month"""
     if not AIRTABLE_API_KEY:
         print("TRACKER ERROR: No Airtable API key")
         return None, "No Airtable API key"
@@ -194,7 +209,7 @@ def create_tracker(project_record_id, project_name, client_name, month, owner):
             'fields': {
                 'Job Number': [project_record_id],  # Linked record field
                 'Spend type': 'Project budget',
-                'Spend': 5000,
+                'Spend': budget,
                 'Description': project_name if project_name else 'TBC',
                 'Month': full_month,
                 'Ballpark': True,
@@ -268,9 +283,26 @@ def incoming():
             client_code = parsed.get('clientCode')
             client_name = parsed.get('clientName', '')
         
-        project_name = parsed.get('projectName', 'TBC')
+        # Extract project name and check if explicit
+        raw_project_name = parsed.get('projectName', 'TBC')
+        project_name_explicit = parsed.get('projectNameExplicit', False)
+        
+        # Format project name: add "TBC - " prefix if inferred
+        if raw_project_name and raw_project_name != 'TBC':
+            if project_name_explicit:
+                project_name = raw_project_name
+            else:
+                project_name = f"TBC - {raw_project_name}"
+        else:
+            project_name = 'TBC'
+        
         parsed_month = parsed.get('month')
         owner = parsed.get('owner')
+        
+        # Extract budget (default to 5000 if not specified)
+        budget = parsed.get('budget')
+        if budget is None or budget == 0:
+            budget = 5000
         
         # Check if we identified a client
         if not client_code:
@@ -307,7 +339,7 @@ def incoming():
         
         # Create the tracker record (using project record ID for linked field)
         project_record_id = project.get('id')
-        tracker, tracker_error = create_tracker(project_record_id, project_name, client_name, target_month, owner)
+        tracker, tracker_error = create_tracker(project_record_id, project_name, client_name, target_month, owner, budget)
         
         if tracker_error:
             # Project created but tracker failed - still return success but note the issue
