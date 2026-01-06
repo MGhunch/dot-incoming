@@ -177,6 +177,7 @@ def create_project(job_number, client_name, project_name):
 def create_tracker(project_record_id, project_name, client_name, month, owner):
     """Create a tracker record with $5K ballpark in the right quarter"""
     if not AIRTABLE_API_KEY:
+        print("TRACKER ERROR: No Airtable API key")
         return None, "No Airtable API key"
     
     headers = {
@@ -205,12 +206,19 @@ def create_tracker(project_record_id, project_name, client_name, month, owner):
             }
         }
         
+        print(f"TRACKER: Creating record with data: {tracker_data}")
+        
         response = httpx.post(create_url, headers=headers, json=tracker_data, timeout=10.0)
+        
+        print(f"TRACKER: Response status: {response.status_code}")
+        print(f"TRACKER: Response body: {response.text}")
+        
         response.raise_for_status()
         
         return response.json(), None
         
     except Exception as e:
+        print(f"TRACKER ERROR: {str(e)}")
         return None, str(e)
 
 
