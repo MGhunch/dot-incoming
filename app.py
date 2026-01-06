@@ -175,7 +175,7 @@ def create_project(job_number, client_name, project_name):
 
 
 def create_tracker(project_record_id, project_name, client_name, month, owner):
-    """Create a tracker record with $5K ballpark in the right quarter"""
+    """Create a tracker record with $5K ballpark in the right month"""
     if not AIRTABLE_API_KEY:
         print("TRACKER ERROR: No Airtable API key")
         return None, "No Airtable API key"
@@ -188,21 +188,17 @@ def create_tracker(project_record_id, project_name, client_name, month, owner):
     try:
         create_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{TRACKER_TABLE}"
         
-        # Determine quarter and column
-        quarter = MONTH_TO_QUARTER.get(month, 'Jan-Mar')
-        quarter_column = QUARTER_TO_COLUMN.get(quarter, 'JAN-MAR')
         full_month = MONTH_TO_FULL.get(month, month)
         
         tracker_data = {
             'fields': {
                 'Job Number': [project_record_id],  # Linked record field
                 'Spend type': 'Project budget',
-                'Description': project_name,
+                'Spend': 5000,
+                'Description': project_name if project_name else 'TBC',
                 'Month': full_month,
-                'Quarter': quarter,
                 'Ballpark': True,
-                'Status': 'Active',
-                quarter_column: 5000
+                'Status': 'Active'
             }
         }
         
