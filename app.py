@@ -160,9 +160,8 @@ def create_project(job_number, client_name, project_name):
             'fields': {
                 'Job Number': job_number,
                 'Project Name': project_name,
-                'Client': client_name,
                 'Status': 'Incoming',
-                'Stage': 'Clarify'
+                'Stage': 'Triage'
             }
         }
         
