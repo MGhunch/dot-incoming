@@ -194,10 +194,9 @@ def create_tracker(project_record_id, project_name, client_name, month, owner):
         
         tracker_data = {
             'fields': {
-                'Job Number': [project_record_id],  # Linked record field - array of record IDs
-                'Project Name': project_name,
-                'Owner': owner if owner else 'Unknown right now',
+                'Job Number': [project_record_id],  # Linked record field
                 'Spend type': 'Project budget',
+                'Description': project_name,
                 'Month': full_month,
                 'Quarter': quarter,
                 'Ballpark': True,
